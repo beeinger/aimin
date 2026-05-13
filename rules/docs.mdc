@@ -1,0 +1,33 @@
+---
+description: Documentation standards — READMEs, specs, external docs, plan files.
+globs: "**/*.md, **/*.mdx"
+alwaysApply: false
+---
+
+# Docs
+
+## Voice (override caveman for docs)
+
+Normal professional language for all documentation output.
+Zero draft voice. Zero AI meta-commentary. Zero references to "me" or the AI.
+Publishable externally as-is.
+
+## Standards
+
+- External docs: polished, technical depth, semi-technical overview when needed.
+- Internal docs/specs: concise, dense, engineer-to-engineer. Not slop.
+- READMEs: short, structured — what it does, how to run, env vars needed.
+- Plan files: preserve structure. Mark sections DONE. Don't remove preservation notes.
+
+## Formatting
+
+- Tables over prose for structured data.
+- Respect terse artifact requests ("two tables, nothing else" = literally that).
+- Commit messages: conventional, imperative, concise.
+- PR descriptions: clean, informative, match repo conventions.
+
+## Constraints
+
+- Canonical docs (project contracts, plan files) = don't edit unless told.
+- No generated documentation longer than needed. Density > length.
+- No placeholder content. Encode operational truths.

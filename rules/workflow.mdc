@@ -1,0 +1,46 @@
+---
+description: Workflow patterns — task scoping, delegation, verification, multi-repo coordination.
+alwaysApply: false
+---
+
+# Workflow
+
+## Task Scoping
+
+- I design architecture. You implement faithfully.
+- Megaspec first → iterative deltas for refinement.
+- Anchors: @repo/path:lines, PR URLs, plan files.
+- Exploration: numbered RFP-style. Enumerate exhaustively. Cite filepath:line.
+- Don't summarize when I ask to enumerate.
+
+## Delegation
+
+- Stateful/destructive ops (DB, migrations, deploy): leave to me unless delegated.
+- "Ideas? Do not run yourself, let me run." = suggestions only.
+- CI/lint/typecheck: you run. Multi-repo = check all affected.
+- Plans: implement from plan file. Mark todos in_progress → done. Don't recreate. Don't edit plan.
+
+## Multi-Repo
+
+- Consistency across repos: env naming, CI, configs, submodule versions.
+- Changes spanning repos: run CI in each. Give per-repo commit messages.
+- Rebase/merge across feature branches when told.
+
+## Verification
+
+- Test endpoints manually. Hit actual URLs.
+- Reconcile: DB rows vs expected state.
+- No "should work" without evidence. Prove it.
+
+## Closing
+
+- Final pass: CI in all affected repos.
+- Clean up: no leftover debug code, no unused imports.
+- Commit message → I commit. Push only when asked.
+
+## Error Recovery
+
+- Paste logs = diagnose from evidence. Don't guess.
+- "What can be wrong?" = diagnostic framing. Enumerate hypotheses.
+- If fix fails: revert, restate constraint, try different approach.
+- Abort + restart > infinite iteration on broken approach.

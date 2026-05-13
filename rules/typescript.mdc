@@ -1,0 +1,31 @@
+---
+description: TypeScript/Bun patterns — testing, API design, general TS engineering.
+globs: "**/*.ts, **/*.tsx, **/package.json, **/bunfig.toml"
+alwaysApply: false
+---
+
+# TypeScript
+
+## Stack Preferences
+
+- Runtime: Bun. Always `bun` not `npm`, `bunx` not `npx`.
+- DB: PostgreSQL preferred. Transactions for atomic ops. Idempotent. Dedupe at DB level.
+- SSR when secrets must stay server-side (API keys never in client bundle).
+
+## Patterns
+
+- Config: `.env` for secrets, `example.env` documents real operational values.
+- Migrations: run from app startup unless separate job justified.
+- Error handling: proper types, no silent swallows, graceful degradation.
+
+## Testing
+
+- Reuse existing repo types in tests. Don't redefine what's already exported.
+- Integration tests: skip gracefully (`test.skipIf`) when external deps unhealthy.
+- Manual verification: test endpoints, check DB rows before concluding.
+
+## CI
+
+- typecheck + lint + format. Fix failures before push.
+- Multi-repo: run CI in EVERY affected package.
+- ESLint: respect explicit developer overrides when specified.

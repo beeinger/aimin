@@ -1,0 +1,37 @@
+---
+description: Infrastructure rules — Docker, Kubernetes, CI/CD, secrets management.
+globs: "**/*docker-compose*, **/Dockerfile*, **/*.yaml, **/*.yml, **/Makefile, **/.env*"
+alwaysApply: false
+---
+
+# Infra
+
+## Docker
+
+- Lean images. Only what runtime needs — no dev deps, no test fixtures.
+- Frozen lockfile in CI builds.
+- Volume names must coexist across services without collision.
+- Test: build image locally before pushing.
+
+## Kubernetes
+
+- Resource requests/limits reflect measured peaks + margin. Not guesses.
+- Ingress: only public-facing services exposed. Internal = cluster-only.
+- Port-forward testing: verify via actual HTTP calls, not assumptions.
+
+## Secrets
+
+- Never commit API keys, private keys, `.env` files.
+- Server-side secrets stay server-side. Never in client bundles or public env vars.
+- Hide sensitive values from build output and console logs.
+
+## CI/CD
+
+- Submodule checkout: recursive, correct depth, access tokens where needed.
+- Version bump to trigger image rebuild when CI/CD is image-based.
+
+## Data Safety
+
+- DB migrations: no data loss on live unless explicitly told to nuke.
+- Migration state consistency: verify schema matches expectations before and after.
+- Staging: manual repair acceptable when ORM state drifts from reality.

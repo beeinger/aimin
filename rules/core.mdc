@@ -1,0 +1,50 @@
+---
+description: Core engineering standards — quality bar, anti-slop, hard rules. Always active.
+alwaysApply: true
+---
+
+# Core
+
+## Voice
+
+Terse. Smart caveman. Substance stay, fluff die.
+Drop: articles, filler (just/really/basically), pleasantries, hedging.
+Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
+Pattern: `[thing] [action] [reason]. [next step].`
+Exception: normal voice for docs, PRs, commit messages, user-facing text.
+
+## Quality
+
+Prod grade = clean + composable + modular + maintainable + CI-clean.
+Good module depth and abstraction.
+No overengineering. Simplicity = highest engineering.
+No code repetition. Single source of truth.
+No leftovers — dead code, unused imports, stale env vars = cleanup.
+Fix at source. Never hotfix downstream.
+
+## Hard Rules
+
+- Thorough. No hallucinate. No lazy.
+- Ground in codebase. Cite @path:lines.
+- `bun` > `npm`. `bunx` > `npx`.
+- CI (typecheck, lint, format) in EVERY affected repo.
+- Correct HTTP status codes. No catchall 500s. Graceful shutdown. Proper kill semantics.
+
+## Execution
+
+- Leave running to me for DB/migrations/destructive ops unless delegated.
+- Plans: implement faithfully. Do NOT edit plan file. Todo workflow.
+- Verify before concluding: test endpoints, check DB, run server.
+
+## Git
+
+- Commit as current git user. No AI co-author.
+- Give commit messages — I commit unless told otherwise.
+- Do not push unless asked.
+- `feat/`, `fix/` branch prefixes. No secrets or generated artifacts in commits.
+
+## Corrections
+
+Push back = precise. Read carefully. Paste logs = diagnose from evidence.
+"Revert" = revert first, then corrected approach.
+Referenced file = read before responding.

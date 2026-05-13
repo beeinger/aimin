@@ -1,0 +1,423 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve real path even through symlinks
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+RULES_DIR="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+INSTALL_DIR="${HOME}/.aimin"
+BIN_DIR="${HOME}/.local/bin"
+BIN_NAME="aimin"
+TARGETS_FILE="$RULES_DIR/targets"
+REPO="beeinger/aimin"
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+DIM='\033[2m'
+NC='\033[0m'
+
+ok()   { echo -e "  ${GREEN}✓${NC} $1"; }
+skip() { echo -e "  ${YELLOW}→${NC} $1"; }
+err()  { echo -e "  ${RED}✗${NC} $1"; }
+dim()  { echo -e "  ${DIM}$1${NC}"; }
+
+safe_link() {
+  local src="$1" dst="$2" label="$3"
+  mkdir -p "$(dirname "$dst")"
+  if [ -L "$dst" ]; then
+    ln -sfn "$src" "$dst"
+    ok "$label"
+  elif [ -f "$dst" ] || [ -d "$dst" ]; then
+    skip "$label — exists (not a symlink, back up manually)"
+  else
+    ln -sfn "$src" "$dst"
+    ok "$label"
+  fi
+}
+
+rm_link() {
+  if [ -L "$1" ]; then
+    rm "$1"
+    ok "removed $1"
+  fi
+}
+
+load_targets() {
+  if [ -f "$TARGETS_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%%#*}"
+      line="$(echo "$line" | xargs)"
+      [ -n "$line" ] && echo "$line"
+    done < "$TARGETS_FILE"
+  fi
+}
+
+link_mdc_to() {
+  local target_dir="$1" label="$2"
+  if [ -d "$target_dir" ]; then
+    mkdir -p "$target_dir/rules"
+    for f in "$RULES_DIR"/rules/*.mdc; do
+      fname="$(basename "$f")"
+      safe_link "$f" "$target_dir/rules/$fname" "$label  $fname"
+    done
+  else
+    skip "$label — $target_dir not found"
+  fi
+}
+
+unlink_mdc_from() {
+  local target_dir="$1"
+  if [ -d "$target_dir/rules" ]; then
+    for f in "$RULES_DIR"/rules/*.mdc; do
+      rm_link "$target_dir/rules/$(basename "$f")"
+    done
+    rmdir "$target_dir/rules" 2>/dev/null && ok "removed $target_dir/rules/ (empty)" || true
+  fi
+}
+
+# ── Commands ──────────────────────────────────────────────
+
+cmd_setup() {
+  echo ""
+  echo "  aimin setup"
+  echo ""
+
+  # Global: Codex
+  safe_link "$RULES_DIR/AGENTS.md" "$HOME/.codex/AGENTS.md" \
+    "codex    ~/.codex/AGENTS.md"
+
+  # Global: Claude Code
+  safe_link "$RULES_DIR/CLAUDE.md" "$HOME/.claude/CLAUDE.md" \
+    "claude   ~/.claude/CLAUDE.md"
+
+  # Global: OpenCode
+  safe_link "$RULES_DIR/AGENTS.md" "$HOME/.config/opencode/AGENTS.md" \
+    "opencode ~/.config/opencode/AGENTS.md"
+
+  # Cursor
+  if [ -d "$HOME/.cursor" ]; then
+    link_mdc_to "$HOME/.cursor" "cursor"
+  else
+    skip "cursor — ~/.cursor not found"
+  fi
+
+  # Custom targets
+  while IFS= read -r target; do
+    local label
+    label="$(basename "$target")"
+    link_mdc_to "$target" "$label"
+  done < <(load_targets)
+
+  echo ""
+  ok "all tools configured"
+  echo ""
+}
+
+cmd_teardown() {
+  echo ""
+  echo "  aimin teardown"
+  echo ""
+
+  rm_link "$HOME/.codex/AGENTS.md"
+  rm_link "$HOME/.claude/CLAUDE.md"
+  rm_link "$HOME/.config/opencode/AGENTS.md"
+
+  if [ -d "$HOME/.cursor/rules" ]; then
+    unlink_mdc_from "$HOME/.cursor"
+  fi
+
+  while IFS= read -r target; do
+    unlink_mdc_from "$target"
+  done < <(load_targets)
+
+  echo ""
+  ok "all tools deconfigured"
+  echo ""
+}
+
+cmd_target() {
+  local subcmd="${1:-list}"
+  shift 2>/dev/null || true
+
+  case "$subcmd" in
+    add)
+      if [ $# -eq 0 ]; then
+        err "usage: aimin target add <path>"
+        exit 1
+      fi
+      local target
+      target="$(cd "$1" 2>/dev/null && pwd || echo "$1")"
+      touch "$TARGETS_FILE"
+      if grep -qxF "$target" "$TARGETS_FILE" 2>/dev/null; then
+        skip "$target already registered"
+      else
+        echo "$target" >> "$TARGETS_FILE"
+        ok "added $target"
+        link_mdc_to "$target" "$(basename "$target")"
+      fi
+      ;;
+    rm|remove)
+      if [ $# -eq 0 ]; then
+        err "usage: aimin target rm <path>"
+        exit 1
+      fi
+      local target
+      target="$(cd "$1" 2>/dev/null && pwd || echo "$1")"
+      if [ -f "$TARGETS_FILE" ]; then
+        local tmp
+        tmp="$(mktemp)"
+        grep -vxF "$target" "$TARGETS_FILE" > "$tmp" || true
+        mv "$tmp" "$TARGETS_FILE"
+        unlink_mdc_from "$target"
+        ok "removed $target"
+      else
+        err "$target not registered"
+      fi
+      ;;
+    list|ls)
+      echo ""
+      echo "  Custom targets:"
+      echo ""
+      local count=0
+      while IFS= read -r target; do
+        if [ -d "$target" ]; then
+          ok "$target"
+        else
+          err "$target (not found)"
+        fi
+        count=$((count + 1))
+      done < <(load_targets)
+      if [ "$count" -eq 0 ]; then
+        dim "none — use: aimin target add <path>"
+      fi
+      echo ""
+      ;;
+    *)
+      err "usage: aimin target [add|rm|list] [path]"
+      exit 1
+      ;;
+  esac
+}
+
+cmd_add() {
+  if [ $# -eq 0 ]; then
+    err "usage: aimin add <project-dir> [project-dir ...]"
+    exit 1
+  fi
+
+  echo ""
+  echo "  aimin add"
+  echo ""
+
+  for dir in "$@"; do
+    dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
+    if [ -d "$dir" ]; then
+      mkdir -p "$dir/.cursor"
+      safe_link "$RULES_DIR/rules" "$dir/.cursor/rules" "$dir/.cursor/rules"
+      safe_link "$RULES_DIR/AGENTS.md" "$dir/AGENTS.md" "$dir/AGENTS.md"
+      safe_link "$RULES_DIR/CLAUDE.md" "$dir/CLAUDE.md" "$dir/CLAUDE.md"
+    else
+      err "$dir — not found"
+    fi
+  done
+  echo ""
+}
+
+cmd_remove() {
+  if [ $# -eq 0 ]; then
+    err "usage: aimin remove <project-dir> [project-dir ...]"
+    exit 1
+  fi
+
+  echo ""
+  echo "  aimin remove"
+  echo ""
+
+  for dir in "$@"; do
+    dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
+    if [ -d "$dir" ]; then
+      rm_link "$dir/.cursor/rules"
+      rm_link "$dir/AGENTS.md"
+      rm_link "$dir/CLAUDE.md"
+    else
+      err "$dir — not found"
+    fi
+  done
+  echo ""
+}
+
+cmd_status() {
+  echo ""
+  echo "  aimin status"
+  echo ""
+
+  check() {
+    local label="$1" path="$2"
+    if [ -L "$path" ]; then
+      local target
+      target="$(readlink "$path")"
+      ok "$label → $target"
+    elif [ -f "$path" ] || [ -d "$path" ]; then
+      skip "$label — exists but not a symlink"
+    else
+      err "$label — not installed"
+    fi
+  }
+
+  echo "  Global:"
+  check "codex   " "$HOME/.codex/AGENTS.md"
+  check "claude  " "$HOME/.claude/CLAUDE.md"
+  check "opencode" "$HOME/.config/opencode/AGENTS.md"
+  echo ""
+
+  echo "  Cursor:"
+  if [ -d "$HOME/.cursor/rules" ]; then
+    for f in "$RULES_DIR"/rules/*.mdc; do
+      check "  $(basename "$f")" "$HOME/.cursor/rules/$(basename "$f")"
+    done
+  else
+    err "  ~/.cursor/rules/ — not found"
+  fi
+  echo ""
+
+  local has_targets=false
+  while IFS= read -r target; do
+    if ! $has_targets; then
+      echo "  Custom targets:"
+      has_targets=true
+    fi
+    local label
+    label="$(basename "$target")"
+    if [ -d "$target/rules" ]; then
+      for f in "$RULES_DIR"/rules/*.mdc; do
+        check "  $label/$(basename "$f")" "$target/rules/$(basename "$f")"
+      done
+    else
+      err "  $label — $target not found"
+    fi
+  done < <(load_targets)
+  $has_targets && echo ""
+
+  echo "  Rules source: $RULES_DIR"
+  echo ""
+}
+
+cmd_uninstall() {
+  echo ""
+  echo "  aimin uninstall"
+  echo ""
+
+  cmd_teardown
+
+  local bin_path="$BIN_DIR/$BIN_NAME"
+  if [ -L "$bin_path" ]; then
+    rm "$bin_path"
+    ok "removed $bin_path"
+  fi
+
+  if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+    ok "removed $INSTALL_DIR"
+  fi
+
+  echo ""
+  ok "aimin fully removed"
+  echo ""
+}
+
+cmd_edit() {
+  local editor="${EDITOR:-code}"
+  "$editor" "$RULES_DIR"
+}
+
+cmd_path() {
+  echo "$RULES_DIR"
+}
+
+cmd_update() {
+  echo ""
+  echo "  aimin update"
+  echo ""
+
+  if ! command -v git &>/dev/null; then
+    err "git not found"
+    exit 1
+  fi
+
+  if [ -d "$RULES_DIR/.git" ]; then
+    local before after
+    before="$(git -C "$RULES_DIR" rev-parse --short HEAD)"
+    git -C "$RULES_DIR" fetch origin main --quiet
+    git -C "$RULES_DIR" reset --hard origin/main --quiet
+    after="$(git -C "$RULES_DIR" rev-parse --short HEAD)"
+
+    if [ "$before" = "$after" ]; then
+      ok "already up to date ($after)"
+    else
+      ok "updated $before → $after"
+    fi
+  else
+    local tmp
+    tmp="$(mktemp -d)"
+    git clone --depth 1 "https://github.com/$REPO.git" "$tmp" --quiet
+    rsync -a --delete --exclude='.git' --exclude='.gitignore' --exclude='targets' "$tmp/" "$RULES_DIR/"
+    rm -rf "$tmp"
+    ok "updated from github.com/$REPO (non-git install)"
+  fi
+
+  cmd_setup
+}
+
+cmd_help() {
+  echo -e ""
+  echo -e "  ${GREEN}aimin${NC} — personal AI coding agent rules"
+  echo -e ""
+  echo -e "  Commands:"
+  echo -e "    setup              Link rules to all tools (codex, claude, opencode, cursor)"
+  echo -e "    teardown           Remove all global links"
+  echo -e "    update             Pull latest from github.com/$REPO"
+  echo -e "    uninstall          Teardown + remove CLI + delete ~/.aimin"
+  echo -e "    add <dirs>         Add rules to specific project directories"
+  echo -e "    remove <dirs>      Remove rules from specific project directories"
+  echo -e "    target add <path>  Register a custom rules target (e.g. another cursor profile)"
+  echo -e "    target rm <path>   Unregister a custom rules target"
+  echo -e "    target list        Show registered custom targets"
+  echo -e "    status             Show what's installed where"
+  echo -e "    edit               Open rules in \$EDITOR"
+  echo -e "    path               Print rules directory path"
+  echo -e "    help               Show this help"
+  echo -e ""
+  echo -e "  Examples:"
+  echo -e "    aimin setup"
+  echo -e "    aimin update"
+  echo -e "    aimin target add ~/.hcursor-profile    ${DIM}# custom cursor profile${NC}"
+  echo -e "    aimin target add ~/.windsurf           ${DIM}# another IDE${NC}"
+  echo -e "    aimin add ~/Work/my-project"
+  echo -e "    aimin add .                            ${DIM}# current directory${NC}"
+  echo -e "    aimin remove ~/Work/my-project"
+  echo -e "    aimin status"
+  echo -e "    aimin teardown"
+  echo -e ""
+}
+
+# ── Main ──────────────────────────────────────────────────
+
+case "${1:-help}" in
+  setup)     cmd_setup ;;
+  teardown)  cmd_teardown ;;
+  update)    cmd_update ;;
+  uninstall) cmd_uninstall ;;
+  add)       shift; cmd_add "$@" ;;
+  remove)    shift; cmd_remove "$@" ;;
+  target)    shift; cmd_target "$@" ;;
+  status)    cmd_status ;;
+  edit)      cmd_edit ;;
+  path)      cmd_path ;;
+  help|-h|--help) cmd_help ;;
+  *)         err "unknown command: $1"; cmd_help; exit 1 ;;
+esac

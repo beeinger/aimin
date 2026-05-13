@@ -1,0 +1,26 @@
+---
+description: Solidity/Foundry/smart contract rules — testing, deployment, verification.
+globs: "**/*.sol, **/foundry.toml, **/remappings.txt"
+alwaysApply: false
+---
+
+# Solidity
+
+## Stack
+
+- Framework: Foundry. `forge build`, `forge test`, `forge script`.
+- Formatter: `forge fmt`. Linter: `forge lint`.
+- Contracts submodule: readonly in consumer repos. Don't format or test there.
+
+## Deployment
+
+- Makefile-driven. `.env` for private key, RPC URL, deploy params.
+- Hide private keys from console output. Never log sensitive values.
+- Etherscan verification: sufficient retries + delay. Retry manually if partial.
+- Submodule hygiene: pinned commits that exist on remote.
+
+## Standards
+
+- Production grade. Audit-minded. No vulnerabilities.
+- Tests cover edge cases, access control, revert conditions.
+- CI: forge build + test + fmt check. Submodule recursive checkout.
