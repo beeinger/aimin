@@ -63,7 +63,7 @@ link_mdc_to() {
     mkdir -p "$target_dir/rules"
     for f in "$RULES_DIR"/rules/*.mdc; do
       fname="$(basename "$f")"
-      safe_link "$f" "$target_dir/rules/$fname" "$label  $fname"
+      safe_link "$f" "$target_dir/rules/$fname" "$label  rules/$fname"
     done
   else
     skip "$label — $target_dir not found"
@@ -77,6 +77,32 @@ unlink_mdc_from() {
       rm_link "$target_dir/rules/$(basename "$f")"
     done
     rmdir "$target_dir/rules" 2>/dev/null && ok "removed $target_dir/rules/ (empty)" || true
+  fi
+}
+
+link_skills_to() {
+  local target_dir="$1" label="$2"
+  if [ -d "$target_dir" ]; then
+    mkdir -p "$target_dir/skills"
+    for d in "$RULES_DIR"/skills/*/; do
+      [ -d "$d" ] || continue
+      local sname
+      sname="$(basename "$d")"
+      safe_link "$d" "$target_dir/skills/$sname" "$label  skills/$sname"
+    done
+  else
+    skip "$label — $target_dir not found"
+  fi
+}
+
+unlink_skills_from() {
+  local target_dir="$1"
+  if [ -d "$target_dir/skills" ]; then
+    for d in "$RULES_DIR"/skills/*/; do
+      [ -d "$d" ] || continue
+      rm_link "$target_dir/skills/$(basename "$d")"
+    done
+    rmdir "$target_dir/skills" 2>/dev/null && ok "removed $target_dir/skills/ (empty)" || true
   fi
 }
 
@@ -102,6 +128,7 @@ cmd_setup() {
   # Cursor
   if [ -d "$HOME/.cursor" ]; then
     link_mdc_to "$HOME/.cursor" "cursor"
+    link_skills_to "$HOME/.cursor" "cursor"
   else
     skip "cursor — ~/.cursor not found"
   fi
@@ -111,6 +138,7 @@ cmd_setup() {
     local label
     label="$(basename "$target")"
     link_mdc_to "$target" "$label"
+    link_skills_to "$target" "$label"
   done < <(load_targets)
 
   echo ""
@@ -127,12 +155,14 @@ cmd_teardown() {
   rm_link "$HOME/.claude/CLAUDE.md"
   rm_link "$HOME/.config/opencode/AGENTS.md"
 
-  if [ -d "$HOME/.cursor/rules" ]; then
+  if [ -d "$HOME/.cursor" ]; then
     unlink_mdc_from "$HOME/.cursor"
+    unlink_skills_from "$HOME/.cursor"
   fi
 
   while IFS= read -r target; do
     unlink_mdc_from "$target"
+    unlink_skills_from "$target"
   done < <(load_targets)
 
   echo ""
@@ -158,7 +188,10 @@ cmd_target() {
       else
         echo "$target" >> "$TARGETS_FILE"
         ok "added $target"
-        link_mdc_to "$target" "$(basename "$target")"
+        local label
+        label="$(basename "$target")"
+        link_mdc_to "$target" "$label"
+        link_skills_to "$target" "$label"
       fi
       ;;
     rm|remove)
@@ -174,6 +207,7 @@ cmd_target() {
         grep -vxF "$target" "$TARGETS_FILE" > "$tmp" || true
         mv "$tmp" "$TARGETS_FILE"
         unlink_mdc_from "$target"
+        unlink_skills_from "$target"
         ok "removed $target"
       else
         err "$target not registered"
@@ -219,6 +253,7 @@ cmd_add() {
     if [ -d "$dir" ]; then
       mkdir -p "$dir/.cursor"
       safe_link "$RULES_DIR/rules" "$dir/.cursor/rules" "$dir/.cursor/rules"
+      safe_link "$RULES_DIR/skills" "$dir/.cursor/skills" "$dir/.cursor/skills"
       safe_link "$RULES_DIR/AGENTS.md" "$dir/AGENTS.md" "$dir/AGENTS.md"
       safe_link "$RULES_DIR/CLAUDE.md" "$dir/CLAUDE.md" "$dir/CLAUDE.md"
     else
@@ -242,6 +277,7 @@ cmd_remove() {
     dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
     if [ -d "$dir" ]; then
       rm_link "$dir/.cursor/rules"
+      rm_link "$dir/.cursor/skills"
       rm_link "$dir/AGENTS.md"
       rm_link "$dir/CLAUDE.md"
     else
@@ -275,13 +311,24 @@ cmd_status() {
   check "opencode" "$HOME/.config/opencode/AGENTS.md"
   echo ""
 
-  echo "  Cursor:"
+  echo "  Cursor rules:"
   if [ -d "$HOME/.cursor/rules" ]; then
     for f in "$RULES_DIR"/rules/*.mdc; do
       check "  $(basename "$f")" "$HOME/.cursor/rules/$(basename "$f")"
     done
   else
     err "  ~/.cursor/rules/ — not found"
+  fi
+  echo ""
+
+  echo "  Cursor skills:"
+  if [ -d "$HOME/.cursor/skills" ]; then
+    for d in "$RULES_DIR"/skills/*/; do
+      [ -d "$d" ] || continue
+      check "  $(basename "$d")" "$HOME/.cursor/skills/$(basename "$d")"
+    done
+  else
+    err "  ~/.cursor/skills/ — not found"
   fi
   echo ""
 
@@ -293,9 +340,13 @@ cmd_status() {
     fi
     local label
     label="$(basename "$target")"
-    if [ -d "$target/rules" ]; then
+    if [ -d "$target" ]; then
       for f in "$RULES_DIR"/rules/*.mdc; do
-        check "  $label/$(basename "$f")" "$target/rules/$(basename "$f")"
+        check "  $label/rules/$(basename "$f")" "$target/rules/$(basename "$f")"
+      done
+      for d in "$RULES_DIR"/skills/*/; do
+        [ -d "$d" ] || continue
+        check "  $label/skills/$(basename "$d")" "$target/skills/$(basename "$d")"
       done
     else
       err "  $label — $target not found"
@@ -378,12 +429,12 @@ cmd_help() {
   echo -e "  ${GREEN}aimin${NC} — personal AI coding agent rules"
   echo -e ""
   echo -e "  Commands:"
-  echo -e "    setup              Link rules to all tools (codex, claude, opencode, cursor)"
+  echo -e "    setup              Link rules + skills to all tools"
   echo -e "    teardown           Remove all global links"
   echo -e "    update             Pull latest from github.com/$REPO"
   echo -e "    uninstall          Teardown + remove CLI + delete ~/.aimin"
-  echo -e "    add <dirs>         Add rules to specific project directories"
-  echo -e "    remove <dirs>      Remove rules from specific project directories"
+  echo -e "    add <dirs>         Add rules + skills to project directories"
+  echo -e "    remove <dirs>      Remove rules + skills from project directories"
   echo -e "    target add <path>  Register a custom rules target (e.g. another cursor profile)"
   echo -e "    target rm <path>   Unregister a custom rules target"
   echo -e "    target list        Show registered custom targets"

@@ -36,9 +36,9 @@ aimin uninstall          # Full removal
 | Codex | `~/.codex/AGENTS.md` |
 | Claude Code | `~/.claude/CLAUDE.md` |
 | OpenCode | `~/.config/opencode/AGENTS.md` |
-| Cursor | `~/.cursor/rules/*.mdc` |
+| Cursor | `~/.cursor/rules/*.mdc`, `~/.cursor/skills/*` |
 
-Per-project `aimin add` links `.cursor/rules/`, `AGENTS.md`, and `CLAUDE.md` into the project.
+Per-project `aimin add` links `.cursor/rules/`, `.cursor/skills/`, `AGENTS.md`, and `CLAUDE.md` into the project.
 
 ## Custom Targets
 
@@ -65,6 +65,8 @@ rules/
   infra.mdc      Docker/k8s/CI/secrets (glob: Dockerfile, *.yaml)
   docs.mdc       Documentation standards (glob: *.md)
   workflow.mdc   Task scoping, delegation, verification
+skills/
+  deslop/        Deep repo audit — find slop, kill slop, ship plan
 bin/
   aimin          CLI entrypoint
 ```
