@@ -113,19 +113,23 @@ cmd_setup() {
   echo "  aimin setup"
   echo ""
 
-  # Global: Codex
+  # Global: Codex (reads ~/.codex/AGENTS.md)
   safe_link "$RULES_DIR/AGENTS.md" "$HOME/.codex/AGENTS.md" \
     "codex    ~/.codex/AGENTS.md"
 
-  # Global: Claude Code
+  # Global: Claude Code (reads ~/.claude/CLAUDE.md, ~/.claude/skills/)
   safe_link "$RULES_DIR/CLAUDE.md" "$HOME/.claude/CLAUDE.md" \
     "claude   ~/.claude/CLAUDE.md"
+  link_skills_to "$HOME/.claude" "claude"
 
-  # Global: OpenCode
+  # Global: OpenCode (reads ~/.config/opencode/AGENTS.md, ~/.agents/skills/, ~/.claude/skills/)
   safe_link "$RULES_DIR/AGENTS.md" "$HOME/.config/opencode/AGENTS.md" \
     "opencode ~/.config/opencode/AGENTS.md"
 
-  # Cursor
+  # Global: Agent Skills standard (read by Codex, Cursor, OpenCode)
+  link_skills_to "$HOME/.agents" "agents"
+
+  # Cursor: rules + skills
   if [ -d "$HOME/.cursor" ]; then
     link_mdc_to "$HOME/.cursor" "cursor"
     link_skills_to "$HOME/.cursor" "cursor"
@@ -152,8 +156,13 @@ cmd_teardown() {
   echo ""
 
   rm_link "$HOME/.codex/AGENTS.md"
+
   rm_link "$HOME/.claude/CLAUDE.md"
+  unlink_skills_from "$HOME/.claude"
+
   rm_link "$HOME/.config/opencode/AGENTS.md"
+
+  unlink_skills_from "$HOME/.agents"
 
   if [ -d "$HOME/.cursor" ]; then
     unlink_mdc_from "$HOME/.cursor"
@@ -253,7 +262,8 @@ cmd_add() {
     if [ -d "$dir" ]; then
       mkdir -p "$dir/.cursor"
       safe_link "$RULES_DIR/rules" "$dir/.cursor/rules" "$dir/.cursor/rules"
-      safe_link "$RULES_DIR/skills" "$dir/.cursor/skills" "$dir/.cursor/skills"
+      safe_link "$RULES_DIR/skills" "$dir/.agents/skills" "$dir/.agents/skills"
+      safe_link "$RULES_DIR/skills" "$dir/.claude/skills" "$dir/.claude/skills"
       safe_link "$RULES_DIR/AGENTS.md" "$dir/AGENTS.md" "$dir/AGENTS.md"
       safe_link "$RULES_DIR/CLAUDE.md" "$dir/CLAUDE.md" "$dir/CLAUDE.md"
     else
@@ -277,7 +287,8 @@ cmd_remove() {
     dir="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
     if [ -d "$dir" ]; then
       rm_link "$dir/.cursor/rules"
-      rm_link "$dir/.cursor/skills"
+      rm_link "$dir/.agents/skills"
+      rm_link "$dir/.claude/skills"
       rm_link "$dir/AGENTS.md"
       rm_link "$dir/CLAUDE.md"
     else
@@ -311,6 +322,17 @@ cmd_status() {
   check "opencode" "$HOME/.config/opencode/AGENTS.md"
   echo ""
 
+  echo "  Skills:"
+  for d in "$RULES_DIR"/skills/*/; do
+    [ -d "$d" ] || continue
+    local sname
+    sname="$(basename "$d")"
+    check "agents  ~/.agents/skills/$sname" "$HOME/.agents/skills/$sname"
+    check "claude  ~/.claude/skills/$sname" "$HOME/.claude/skills/$sname"
+    check "cursor  ~/.cursor/skills/$sname" "$HOME/.cursor/skills/$sname"
+  done
+  echo ""
+
   echo "  Cursor rules:"
   if [ -d "$HOME/.cursor/rules" ]; then
     for f in "$RULES_DIR"/rules/*.mdc; do
@@ -318,17 +340,6 @@ cmd_status() {
     done
   else
     err "  ~/.cursor/rules/ — not found"
-  fi
-  echo ""
-
-  echo "  Cursor skills:"
-  if [ -d "$HOME/.cursor/skills" ]; then
-    for d in "$RULES_DIR"/skills/*/; do
-      [ -d "$d" ] || continue
-      check "  $(basename "$d")" "$HOME/.cursor/skills/$(basename "$d")"
-    done
-  else
-    err "  ~/.cursor/skills/ — not found"
   fi
   echo ""
 

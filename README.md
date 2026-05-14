@@ -34,11 +34,12 @@ aimin uninstall          # Full removal
 | Tool | Target |
 |------|--------|
 | Codex | `~/.codex/AGENTS.md` |
-| Claude Code | `~/.claude/CLAUDE.md` |
+| Claude Code | `~/.claude/CLAUDE.md`, `~/.claude/skills/*` |
 | OpenCode | `~/.config/opencode/AGENTS.md` |
 | Cursor | `~/.cursor/rules/*.mdc`, `~/.cursor/skills/*` |
+| Agent Skills (universal) | `~/.agents/skills/*` (read by Codex, Cursor, OpenCode) |
 
-Per-project `aimin add` links `.cursor/rules/`, `.cursor/skills/`, `AGENTS.md`, and `CLAUDE.md` into the project.
+Per-project `aimin add` links `.cursor/rules/`, `.agents/skills/`, `.claude/skills/`, `AGENTS.md`, and `CLAUDE.md` into the project.
 
 ## Custom Targets
 
